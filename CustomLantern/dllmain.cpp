@@ -6,69 +6,99 @@
 #include "ModUtils.h" // https://github.com/techiew/EldenRingMods/blob/master/ModUtils.h
 #include "ini.h" // https://github.com/pulzed/mINI
 
-const std::string INI_CONFIG_SECTION = "config";
+using namespace ModUtils;
+using namespace std;
+
+const string INI_CONFIG_SECTION = "config";
 const unsigned char SIGNATURE[16] = { 0x46, 0x58, 0x52, 0x00, 0x00, 0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x55, 0x9D, 0x04, 0x00 };
 
-mINI::INIStructure ini;
-HANDLE pHandle = 0;
-__int64 baseAddress = 0;
+mINI::INIStructure _g_ini;
+HANDLE _g_pHandle = 0;
+__int64 _g_fxrBaseAddress = 0;
+__int64 _g_pBaseAddress = 0;
 
-void setParam(std::string param, int offset) {
-    std::string value = ini.get(INI_CONFIG_SECTION).get(param);
-    ModUtils::Log("Set param \"%s\" value=\"%s\" offset=0x%X\n", param.c_str(), value.c_str(), offset);
+void setParam(string param, int offset)
+{
+    string value = _g_ini.get(INI_CONFIG_SECTION).get(param);
+    Log("%s value=%s offset=0x%X", param.c_str(), value.c_str(), offset);
     if (value != "")
     {
         float floatValue = std::stof(value);
-        WriteProcessMemory(pHandle, (LPVOID)(baseAddress + offset), &floatValue, sizeof(floatValue), 0);
+        WriteProcessMemory(_g_pHandle, (LPVOID)(_g_fxrBaseAddress + offset), &floatValue, sizeof(floatValue), 0);
     }
 }
 
-DWORD WINAPI Patch(LPVOID lpParam)
-{
-    ModUtils::Log("Activating Custom Lantern...");
-
-    DWORD pid = GetCurrentProcessId();
-
-    __int64 processBaseAddress = ModUtils::GetProcessBaseAddress(pid);
-    ModUtils::Log("Process name: %s", ModUtils::GetModuleName(false).c_str());
-    ModUtils::Log("Process ID: %i", pid);
-    ModUtils::Log("Process base address: 0x%I64X", processBaseAddress);
-
-    pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
-
+__int64 getFXRBaseAddress() {
+    __int64 address = _g_pBaseAddress + 0x04549108;
     __int64 result = 0;
-    __int64 address = processBaseAddress + 0x04549108;
 
-    // get the base address of the FXR file copied in memory
-    ReadProcessMemory(pHandle, (LPCVOID)address, &result, sizeof(result), NULL);
-    ReadProcessMemory(pHandle, (LPCVOID)(result + 0x28), &result, sizeof(result), NULL);
-    ReadProcessMemory(pHandle, (LPCVOID)(result + 0x160), &result, sizeof(result), NULL);
-    ReadProcessMemory(pHandle, (LPCVOID)(result + 0x38), &result, sizeof(result), NULL);
-    ReadProcessMemory(pHandle, (LPCVOID)(result + 0xEA0), &result, sizeof(result), NULL);
-    ReadProcessMemory(pHandle, (LPCVOID)(result + 0x08), &result, sizeof(result), NULL);
-    ReadProcessMemory(pHandle, (LPCVOID)(result + 0x48), &result, sizeof(result), NULL);
-    ReadProcessMemory(pHandle, (LPCVOID)(result + 0xEC0), &result, sizeof(result), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)address, &result, sizeof(result), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)(result + 0x28), &result, sizeof(result), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)(result + 0x160), &result, sizeof(result), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)(result + 0x38), &result, sizeof(result), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)(result + 0xEA0), &result, sizeof(result), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)(result + 0x08), &result, sizeof(result), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)(result + 0x48), &result, sizeof(result), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)(result + 0xEC0), &result, sizeof(result), NULL);
 
-    baseAddress = result;
+    return result;
+}
 
+bool isSignatureValid()
+{
     unsigned char buff[sizeof(SIGNATURE) + 1]{};
-    ReadProcessMemory(pHandle, (LPCVOID)(baseAddress), &buff, sizeof(buff), NULL);
+    ReadProcessMemory(_g_pHandle, (LPCVOID)(_g_fxrBaseAddress), &buff, sizeof(buff), NULL);
 
     for (size_t i = 0; i < sizeof(SIGNATURE); i++)
     {
         if (buff[i] != SIGNATURE[i])
         {
-            ModUtils::Log("ERROR: signature in memory seems invalid.");
-
-            exit(1);
+            return false;
         }
     }
 
-    ModUtils::Log("FXR base address: 0x%I64X", result);
+    return true;
+}
 
-    mINI::INIFile file(ModUtils::GetModuleFolderPath() + "\\custom-lantern.ini");
+DWORD WINAPI Patch(LPVOID lpParam)
+{
+    Log("Activating Custom Lantern...");
 
-    file.read(ini);
+    DWORD pid = GetCurrentProcessId();
+
+    _g_pBaseAddress = GetProcessBaseAddress(pid);
+    Log("Process name: %s", GetModuleName(false).c_str());
+    Log("Process ID: %i", pid);
+    Log("Process base address: 0x%I64X", _g_pBaseAddress);
+
+    _g_pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+
+    bool isSignValid = false;
+    _g_fxrBaseAddress = 0;
+
+    for (size_t i = 0; i < 30; i++)
+    {
+        _g_fxrBaseAddress = getFXRBaseAddress();
+        if (isSignatureValid())
+        {
+            isSignValid = true;
+            break;
+        }
+
+        Sleep(2500);
+    }
+
+    if (!isSignValid)
+    {
+        RaiseError("Unable to find the FXR base address. The signature in memory seems invalid. Try to relaunch the game.");
+
+        return 1;
+    }
+
+    Log("FXR base address: 0x%I64X", _g_fxrBaseAddress);
+
+    mINI::INIFile file(GetModuleFolderPath() + "\\custom-lantern.ini");
+    file.read(_g_ini);
 
     /*
     * default values
@@ -102,6 +132,8 @@ DWORD WINAPI Patch(LPVOID lpParam)
     float luminous_intensity = 1.25F;
     */
 
+    Log("Write values in memory...", _g_fxrBaseAddress);
+
     // light color
     setParam("red", 0x1CDC);
     setParam("green", 0x1CE0);
@@ -128,15 +160,16 @@ DWORD WINAPI Patch(LPVOID lpParam)
     setParam("y_rot", 0x1C2C);
     setParam("z_rot", 0x1C30);
 
-    ModUtils::CloseLog();
+    CloseLog();
 
     return 0;
 }
 
-BOOL APIENTRY DllMain( HMODULE hModule,
-                       DWORD  ul_reason_for_call,
-                       LPVOID lpReserved
-                     )
+BOOL APIENTRY DllMain(
+    HMODULE hModule,
+    DWORD  ul_reason_for_call,
+    LPVOID lpReserved
+)
 {
     switch (ul_reason_for_call)
     {
