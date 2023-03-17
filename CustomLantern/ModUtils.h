@@ -134,6 +134,7 @@ namespace ModUtils
 			muModuleName = GetModuleName(true);
 		}
 		Log("Raised error: %s", error.c_str());
+		MessageBoxA(NULL, error.c_str(), muModuleName.c_str(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 	}
 
 	// Gets the base address of the game's memory.
