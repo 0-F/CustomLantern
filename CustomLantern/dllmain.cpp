@@ -50,7 +50,9 @@ struct cfg {
         string luminous_intensity; // 1.25
     } light;
 
-    unsigned int loadDelay = 0;
+    unsigned long loadDelay = 0;
+    uintptr_t ptrOffsetStartAddress = 0;
+    uint64_t maxMemSizeToScan = 0xA0000000;
 } _g_cfg;
 
 mINI::INIStructure _g_iniCustomLantern;
@@ -69,13 +71,29 @@ void WriteMem(std::string value, std::string paramName, int offset)
     }
 }
 
-uintptr_t* GetFXRBaseAddress
-() {
-    uintptr_t startAddress = *(uintptr_t*)(_g_pBaseAddress + 0x3ACC460);
-    uintptr_t endAddress = startAddress + 0xA0000000 - 16;
+uintptr_t* GetFXRBaseAddress()
+{
+    // example:
+    // [pointer_offset_start_address] = 3ABC010
+    // [process_base_address]+3ABC010 -> 7FF35AB00000
+    // [start_address] = 7FF35AB00000
+
+    uintptr_t startAddress = *(uintptr_t*)(_g_pBaseAddress + _g_cfg.ptrOffsetStartAddress);
+    uintptr_t endAddress = startAddress + _g_cfg.maxMemSizeToScan - 16;
     uintptr_t currentAddress = startAddress;
 
     uint64_t* ptrCurrAddr = (uintptr_t*)currentAddress;
+
+    // signature to find
+    //   46 58 52 00 00 00 05 00
+    //   01 00 00 00 55 9D 04 00
+
+    /*				int16 int16 int32       int32
+        F  X  R  \0 00 00 ver.  \1          ID
+        46 58 52 00 00 00 05 00 01 00 00 00 55 9D 04 00
+    */
+
+    // effect ID = 55 9D 04 00 = 0x00049D55 = 302421
 
     // find the signature in memory
     while ((uintptr_t)ptrCurrAddr < endAddress)
@@ -99,6 +117,45 @@ void ReadConfig()
 {
     Log("Read configuration...");
 
+    const string CONFIG = "config";
+
+    struct str
+    {
+        string loadDelay = "load_delay";
+        string ptrOffsetStartAddress = "pointer_offset_start_address";
+        string maxMemSizeToScan = "max_memory_size_to_scan";
+
+        string red = "red";
+        string green = "green";
+        string blue = "blue";
+        string alpha = "alpha";
+
+        string sp_red = "sp_red";
+        string sp_green = "sp_green";
+        string sp_blue = "sp_blue";
+        string sp_alpha = "sp_alpha";
+
+        string radius = "radius";
+
+        string luminous_intensity = "luminous_intensity";
+
+        string x_pos = "x_pos";
+        string y_pos = "y_pos";
+        string z_pos = "z_pos";
+
+        string x_rot = "x_rot";
+        string y_rot = "y_rot";
+        string z_rot = "z_rot";
+    } const STR;
+
+    // default config values
+    struct dflt
+    {
+        string loadDelay = "15000";
+        string ptrOffsetStartAddress = "0x3ACC4C0";
+        string maxMemSizeToScan = "0xA0000000";
+    } const DFLT;
+
     string path = GetModuleFolderPath();
 
     //
@@ -114,21 +171,30 @@ void ReadConfig()
     if (!fileCfg.read(iniCfg))
     {
         // populate the structure
-        iniCfg["config"]["load_delay"] = "10000";
+        iniCfg[CONFIG][STR.loadDelay] = DFLT.loadDelay;
+        iniCfg[CONFIG][STR.ptrOffsetStartAddress] = DFLT.ptrOffsetStartAddress;
+        iniCfg[CONFIG][STR.maxMemSizeToScan] = DFLT.maxMemSizeToScan;
 
         // generate an INI file (overwrites any previous file)
         fileCfg.generate(iniCfg);
     }
 
-    string loadDelay = iniCfg["config"]["load_delay"];
-    if (loadDelay != "")
-    {
-        _g_cfg.loadDelay = stoi(loadDelay);
-    }
-    else
-    {
-        _g_cfg.loadDelay = 10000;
-    }
+    // read values
+    string strLoadDelay = iniCfg[CONFIG][STR.loadDelay];
+    string strPtrOffsetStartAddress = iniCfg[CONFIG][STR.ptrOffsetStartAddress];
+    string strMaxMemSizeToScan = iniCfg[CONFIG][STR.maxMemSizeToScan];
+
+    // set default values if needed
+    if (strLoadDelay == "") { iniCfg[CONFIG][STR.loadDelay] = DFLT.loadDelay; }
+    if (strPtrOffsetStartAddress == "") { iniCfg[CONFIG][STR.ptrOffsetStartAddress] = DFLT.ptrOffsetStartAddress; }
+    if (strMaxMemSizeToScan == "") { iniCfg[CONFIG][STR.maxMemSizeToScan] = DFLT.maxMemSizeToScan; }
+
+    // write ini
+    fileCfg.write(iniCfg);
+
+    _g_cfg.loadDelay = stol(strLoadDelay);
+    _g_cfg.ptrOffsetStartAddress = stoll(strPtrOffsetStartAddress, nullptr, 16); // hexacidemal
+    _g_cfg.maxMemSizeToScan = stoll(strMaxMemSizeToScan, nullptr, 16); // hexadecimal
 
     //
     // custom-lantern.ini
@@ -140,58 +206,58 @@ void ReadConfig()
 
     if (!fileCL.read(iniCL))
     {
-        iniCL["config"]["red"] = "";
-        iniCL["config"]["green"] = "";
-        iniCL["config"]["blue"] = "";
-        iniCL["config"]["alpha"] = "";
+        iniCL[CONFIG][STR.red] = "";
+        iniCL[CONFIG][STR.green] = "";
+        iniCL[CONFIG][STR.blue] = "";
+        iniCL[CONFIG][STR.alpha] = "";
 
-        iniCL["config"]["sp_red"] = "";
-        iniCL["config"]["sp_green"] = "";
-        iniCL["config"]["sp_blue"] = "";
-        iniCL["config"]["sp_alpha"] = "";
+        iniCL[CONFIG][STR.sp_red] = "";
+        iniCL[CONFIG][STR.sp_green] = "";
+        iniCL[CONFIG][STR.sp_blue] = "";
+        iniCL[CONFIG][STR.sp_alpha] = "";
 
-        iniCL["config"]["radius"] = "";
+        iniCL[CONFIG][STR.radius] = "";
 
-        iniCL["config"]["luminous_intensity"] = "";
+        iniCL[CONFIG][STR.luminous_intensity] = "";
 
-        iniCL["config"]["x_pos"] = "";
-        iniCL["config"]["y_pos"] = "";
-        iniCL["config"]["z_pos"] = "";
+        iniCL[CONFIG][STR.x_pos] = "";
+        iniCL[CONFIG][STR.y_pos] = "";
+        iniCL[CONFIG][STR.z_pos] = "";
 
-        iniCL["config"]["x_rot"] = "";
-        iniCL["config"]["y_rot"] = "";
-        iniCL["config"]["z_rot"] = "";
+        iniCL[CONFIG][STR.x_rot] = "";
+        iniCL[CONFIG][STR.y_rot] = "";
+        iniCL[CONFIG][STR.z_rot] = "";
 
         fileCL.generate(iniCL);
     }
 
     // light color
-    _g_cfg.light.color.red = iniCL["config"]["red"];
-    _g_cfg.light.color.green = iniCL["config"]["green"];
-    _g_cfg.light.color.blue = iniCL["config"]["blue"];
-    _g_cfg.light.color.alpha = iniCL["config"]["alpha"];
+    _g_cfg.light.color.red = iniCL[CONFIG][STR.red];
+    _g_cfg.light.color.green = iniCL[CONFIG][STR.green];
+    _g_cfg.light.color.blue = iniCL[CONFIG][STR.blue];
+    _g_cfg.light.color.alpha = iniCL[CONFIG][STR.alpha];
 
     // specular color
-    _g_cfg.light.color.sp_red = iniCL["config"]["sp_red"];
-    _g_cfg.light.color.sp_green = iniCL["config"]["sp_green"];
-    _g_cfg.light.color.sp_blue = iniCL["config"]["sp_blue"];
-    _g_cfg.light.color.sp_alpha = iniCL["config"]["sp_alpha"];
+    _g_cfg.light.color.sp_red = iniCL[CONFIG][STR.sp_red];
+    _g_cfg.light.color.sp_green = iniCL[CONFIG][STR.sp_green];
+    _g_cfg.light.color.sp_blue = iniCL[CONFIG][STR.sp_blue];
+    _g_cfg.light.color.sp_alpha = iniCL[CONFIG][STR.sp_alpha];
 
     // light radius
-    _g_cfg.light.radius = iniCL["config"]["radius"];
+    _g_cfg.light.radius = iniCL[CONFIG][STR.radius];
 
     // luminous intensity
-    _g_cfg.light.luminous_intensity = iniCL["config"]["luminous_intensity"];
+    _g_cfg.light.luminous_intensity = iniCL[CONFIG][STR.luminous_intensity];
 
     // position
-    _g_cfg.light.position.x = iniCL["config"]["x_pos"];
-    _g_cfg.light.position.y = iniCL["config"]["y_pos"];
-    _g_cfg.light.position.z = iniCL["config"]["z_pos"];
+    _g_cfg.light.position.x = iniCL[CONFIG][STR.x_pos];
+    _g_cfg.light.position.y = iniCL[CONFIG][STR.y_pos];
+    _g_cfg.light.position.z = iniCL[CONFIG][STR.z_pos];
 
     // rotation
-    _g_cfg.light.rotation.x = iniCL["config"]["x_rot"];
-    _g_cfg.light.rotation.y = iniCL["config"]["y_rot"];
-    _g_cfg.light.rotation.z = iniCL["config"]["z_rot"];
+    _g_cfg.light.rotation.x = iniCL[CONFIG][STR.x_rot];
+    _g_cfg.light.rotation.y = iniCL[CONFIG][STR.y_rot];
+    _g_cfg.light.rotation.z = iniCL[CONFIG][STR.z_rot];
 
     fileCL.write(iniCL);
 }
