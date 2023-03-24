@@ -4,12 +4,15 @@
 
 #include <iomanip>
 #include <iostream>
+#include <string>
 
 #include "pch.h"
 #include "ModUtils.h" // https://github.com/techiew/EldenRingMods/blob/master/ModUtils.h
 #include "ini.h" // https://github.com/pulzed/mINI
 
 #define _WriteMem(param, offset) WriteMem(param, #param, offset)
+#define GetGeneralConfig(key) _g_cfg.key = ini[SECTION][#key]
+#define GetLightConfig(key) _g_cfg.light.key = ini[SECTION][#key]
 
 using namespace ModUtils;
 using namespace std;
@@ -17,42 +20,35 @@ using namespace std;
 struct cfg {
     struct light // comments = default values
     {
-        struct color
-        {
-            string red;   // 1.0
-            string green; // 0.6313726
-            string blue;  // 0.36862746
-            string alpha; // 1.0
+        string red;   // 1.0
+        string green; // 0.6313726
+        string blue;  // 0.36862746
+        string alpha; // 1.0
 
-            string sp_red;   // 1.0
-            string sp_green; // 0.6313726
-            string sp_blue;  // 0.36862746
-            string sp_alpha; // 1.0
-
-        } color;
+        string sp_red;   // 1.0
+        string sp_green; // 0.6313726
+        string sp_blue;  // 0.36862746
+        string sp_alpha; // 1.0
 
         string radius; // 16.0
 
-        struct position
-        {
-            string x; // 0.0
-            string y; // 0.0
-            string z; // 0.0
-        } position;
-
-        struct rotation
-        {
-            string x; // 0.0
-            string y; // 0.0
-            string z; // 0.0
-        } rotation;
-
         string luminous_intensity; // 1.25
+
+        string x_pos; // 0.0
+        string y_pos; // 0.0
+        string z_pos; // 0.0
+
+        string x_rot; // 0.0
+        string y_rot; // 0.0
+        string z_rot; // 0.0
+
     } light;
 
-    unsigned long loadDelay = 0;
-    uintptr_t ptrOffsetStartAddress = 0;
-    uint64_t maxMemSizeToScan = 0xA0000000;
+    string load_delay;
+
+    string base_address;
+    string region_size;
+    string protect;
 } _g_cfg;
 
 mINI::INIStructure _g_iniCustomLantern;
@@ -78,9 +74,14 @@ uintptr_t* GetFXRBaseAddress()
     // [process_base_address]+3ABC010 -> 7FF35AB00000
     // [start_address] = 7FF35AB00000
 
-    uintptr_t startAddress = *(uintptr_t*)(_g_pBaseAddress + _g_cfg.ptrOffsetStartAddress);
+  /*  uintptr_t startAddress = *(uintptr_t*)(_g_pBaseAddress + _g_cfg.ptrOffsetStartAddress);
     uintptr_t endAddress = startAddress + _g_cfg.maxMemSizeToScan - 16;
     uintptr_t currentAddress = startAddress;
+    */
+    uintptr_t startAddress = 0;
+    uintptr_t endAddress = 0;
+    uintptr_t currentAddress = startAddress;
+
 
     uint64_t* ptrCurrAddr = (uintptr_t*)currentAddress;
 
@@ -113,153 +114,112 @@ uintptr_t* GetFXRBaseAddress()
     return nullptr;
 }
 
+void ReadGeneralConfig(string path)
+{
+    //
+    // config.ini
+    //
+
+    const string SECTION = "config";
+
+    // create a file instance
+    mINI::INIFile file(path + "\\config.ini");
+
+    // create a data structure
+    mINI::INIStructure ini;
+
+    vector<string> keys{ "load_delay", "base_address", "region_size", "protect" };
+
+    if (!file.read(ini))
+    {
+        for (size_t i = 0; i < keys.size(); i++)
+        {
+            // populate the structure
+            ini[SECTION][keys[i]] = "";
+
+            // generate an INI file (overwrites any previous file)
+            file.generate(ini);
+        }
+    }
+
+    // read values
+    GetGeneralConfig(load_delay);
+    GetGeneralConfig(base_address);
+    GetGeneralConfig(region_size);
+    GetGeneralConfig(protect);
+
+    // write ini
+    file.write(ini);
+}
+
+void ReadLightConfig(string path)
+{
+    //
+    // custom-lantern.ini
+    //
+
+    const string SECTION = "config";
+
+    // create a file instance
+    mINI::INIFile file(path + "\\custom-lantern.ini");
+
+    // create a data structure
+    mINI::INIStructure ini;
+
+    vector<string> keys{
+        "red", "green", "blue", "alpha",
+        "sp_red", "sp_green", "sp_blue", "sp_alpha",
+        "radius", "luminous_intensity",
+        "x_pos", "y_pos", "z_pos",
+        "x_rot", "y_rot", "z_rot" };
+
+    if (!file.read(ini))
+    {
+        for (size_t i = 0; i < keys.size(); i++)
+        {
+            // populate the structure
+            ini[SECTION][keys[i]] = "";
+
+            // generate an INI file (overwrites any previous file)
+            file.generate(ini);
+        }
+    }
+
+    // read values
+    GetLightConfig(red);
+    GetLightConfig(green);
+    GetLightConfig(blue);
+    GetLightConfig(alpha);
+    GetLightConfig(sp_red);
+    GetLightConfig(sp_green);
+    GetLightConfig(sp_blue);
+    GetLightConfig(sp_alpha);
+    GetLightConfig(radius);
+    GetLightConfig(luminous_intensity);
+    GetLightConfig(x_pos);
+    GetLightConfig(y_pos);
+    GetLightConfig(z_pos);
+    GetLightConfig(x_rot);
+    GetLightConfig(y_rot);
+    GetLightConfig(z_rot);
+
+    // write ini
+    file.write(ini);
+}
+
 void ReadConfig()
 {
     Log("Read configuration...");
 
     const string CONFIG = "config";
 
-    struct str
-    {
-        string loadDelay = "load_delay";
-        string ptrOffsetStartAddress = "pointer_offset_start_address";
-        string maxMemSizeToScan = "max_memory_size_to_scan";
-
-        string red = "red";
-        string green = "green";
-        string blue = "blue";
-        string alpha = "alpha";
-
-        string sp_red = "sp_red";
-        string sp_green = "sp_green";
-        string sp_blue = "sp_blue";
-        string sp_alpha = "sp_alpha";
-
-        string radius = "radius";
-
-        string luminous_intensity = "luminous_intensity";
-
-        string x_pos = "x_pos";
-        string y_pos = "y_pos";
-        string z_pos = "z_pos";
-
-        string x_rot = "x_rot";
-        string y_rot = "y_rot";
-        string z_rot = "z_rot";
-    } const STR;
-
-    // default config values
-    struct dflt
-    {
-        string loadDelay = "15000";
-        string ptrOffsetStartAddress = "0x3ACC4C0";
-        string maxMemSizeToScan = "0xA0000000";
-    } const DFLT;
-
     string path = GetModuleFolderPath();
 
-    //
     // config.ini
-    //
+    ReadGeneralConfig(path);
 
-    // create a file instance
-    mINI::INIFile fileCfg(path + "\\config.ini");
-
-    // create a data structure
-    mINI::INIStructure iniCfg;
-
-    if (!fileCfg.read(iniCfg))
-    {
-        // populate the structure
-        iniCfg[CONFIG][STR.loadDelay] = DFLT.loadDelay;
-        iniCfg[CONFIG][STR.ptrOffsetStartAddress] = DFLT.ptrOffsetStartAddress;
-        iniCfg[CONFIG][STR.maxMemSizeToScan] = DFLT.maxMemSizeToScan;
-
-        // generate an INI file (overwrites any previous file)
-        fileCfg.generate(iniCfg);
-    }
-
-    // read values
-    string strLoadDelay = iniCfg[CONFIG][STR.loadDelay];
-    string strPtrOffsetStartAddress = iniCfg[CONFIG][STR.ptrOffsetStartAddress];
-    string strMaxMemSizeToScan = iniCfg[CONFIG][STR.maxMemSizeToScan];
-
-    // set default values if needed
-    if (strLoadDelay == "") { iniCfg[CONFIG][STR.loadDelay] = DFLT.loadDelay; }
-    if (strPtrOffsetStartAddress == "") { iniCfg[CONFIG][STR.ptrOffsetStartAddress] = DFLT.ptrOffsetStartAddress; }
-    if (strMaxMemSizeToScan == "") { iniCfg[CONFIG][STR.maxMemSizeToScan] = DFLT.maxMemSizeToScan; }
-
-    // write ini
-    fileCfg.write(iniCfg);
-
-    _g_cfg.loadDelay = stol(strLoadDelay);
-    _g_cfg.ptrOffsetStartAddress = stoll(strPtrOffsetStartAddress, nullptr, 16); // hexacidemal
-    _g_cfg.maxMemSizeToScan = stoll(strMaxMemSizeToScan, nullptr, 16); // hexadecimal
-
-    //
     // custom-lantern.ini
-    //
-
-    mINI::INIFile fileCL(path + "\\custom-lantern.ini");
-
-    mINI::INIStructure iniCL;
-
-    if (!fileCL.read(iniCL))
-    {
-        iniCL[CONFIG][STR.red] = "";
-        iniCL[CONFIG][STR.green] = "";
-        iniCL[CONFIG][STR.blue] = "";
-        iniCL[CONFIG][STR.alpha] = "";
-
-        iniCL[CONFIG][STR.sp_red] = "";
-        iniCL[CONFIG][STR.sp_green] = "";
-        iniCL[CONFIG][STR.sp_blue] = "";
-        iniCL[CONFIG][STR.sp_alpha] = "";
-
-        iniCL[CONFIG][STR.radius] = "";
-
-        iniCL[CONFIG][STR.luminous_intensity] = "";
-
-        iniCL[CONFIG][STR.x_pos] = "";
-        iniCL[CONFIG][STR.y_pos] = "";
-        iniCL[CONFIG][STR.z_pos] = "";
-
-        iniCL[CONFIG][STR.x_rot] = "";
-        iniCL[CONFIG][STR.y_rot] = "";
-        iniCL[CONFIG][STR.z_rot] = "";
-
-        fileCL.generate(iniCL);
-    }
-
-    // light color
-    _g_cfg.light.color.red = iniCL[CONFIG][STR.red];
-    _g_cfg.light.color.green = iniCL[CONFIG][STR.green];
-    _g_cfg.light.color.blue = iniCL[CONFIG][STR.blue];
-    _g_cfg.light.color.alpha = iniCL[CONFIG][STR.alpha];
-
-    // specular color
-    _g_cfg.light.color.sp_red = iniCL[CONFIG][STR.sp_red];
-    _g_cfg.light.color.sp_green = iniCL[CONFIG][STR.sp_green];
-    _g_cfg.light.color.sp_blue = iniCL[CONFIG][STR.sp_blue];
-    _g_cfg.light.color.sp_alpha = iniCL[CONFIG][STR.sp_alpha];
-
-    // light radius
-    _g_cfg.light.radius = iniCL[CONFIG][STR.radius];
-
-    // luminous intensity
-    _g_cfg.light.luminous_intensity = iniCL[CONFIG][STR.luminous_intensity];
-
-    // position
-    _g_cfg.light.position.x = iniCL[CONFIG][STR.x_pos];
-    _g_cfg.light.position.y = iniCL[CONFIG][STR.y_pos];
-    _g_cfg.light.position.z = iniCL[CONFIG][STR.z_pos];
-
-    // rotation
-    _g_cfg.light.rotation.x = iniCL[CONFIG][STR.x_rot];
-    _g_cfg.light.rotation.y = iniCL[CONFIG][STR.y_rot];
-    _g_cfg.light.rotation.z = iniCL[CONFIG][STR.z_rot];
-
-    fileCL.write(iniCL);
+    ReadLightConfig(path);
 }
 
 DWORD WINAPI Patch(LPVOID lpParam)
@@ -268,8 +228,12 @@ DWORD WINAPI Patch(LPVOID lpParam)
 
     ReadConfig();
 
-    Log("Wait %ims", _g_cfg.loadDelay);
-    Sleep(_g_cfg.loadDelay);
+    if (_g_cfg.load_delay != "")
+    {
+        unsigned long loadDelay = stol(_g_cfg.load_delay);
+        Log("Wait %lu ms...", loadDelay);
+        Sleep(loadDelay);
+    }
 
     DWORD pid = GetCurrentProcessId();
     _g_pBaseAddress = GetProcessBaseAddress(pid);
@@ -291,16 +255,16 @@ DWORD WINAPI Patch(LPVOID lpParam)
     Log("Write values in memory if any...");
 
     // light color
-    _WriteMem(_g_cfg.light.color.red, 0x1CDC);
-    _WriteMem(_g_cfg.light.color.green, 0x1CE0);
-    _WriteMem(_g_cfg.light.color.blue, 0x1CE4);
-    _WriteMem(_g_cfg.light.color.alpha, 0x1CE8);
+    _WriteMem(_g_cfg.light.red, 0x1CDC);
+    _WriteMem(_g_cfg.light.green, 0x1CE0);
+    _WriteMem(_g_cfg.light.blue, 0x1CE4);
+    _WriteMem(_g_cfg.light.alpha, 0x1CE8);
 
     // specular color
-    _WriteMem(_g_cfg.light.color.sp_red, 0x1CEC);
-    _WriteMem(_g_cfg.light.color.sp_green, 0x1CF0);
-    _WriteMem(_g_cfg.light.color.sp_blue, 0x1CF4);
-    _WriteMem(_g_cfg.light.color.sp_alpha, 0x1CF8);
+    _WriteMem(_g_cfg.light.sp_red, 0x1CEC);
+    _WriteMem(_g_cfg.light.sp_green, 0x1CF0);
+    _WriteMem(_g_cfg.light.sp_blue, 0x1CF4);
+    _WriteMem(_g_cfg.light.sp_alpha, 0x1CF8);
 
     // light radius
     _WriteMem(_g_cfg.light.radius, 0x1CFC);
@@ -309,14 +273,14 @@ DWORD WINAPI Patch(LPVOID lpParam)
     _WriteMem(_g_cfg.light.luminous_intensity, 0x1D0C);
 
     // position
-    _WriteMem(_g_cfg.light.position.x, 0x1C1C);
-    _WriteMem(_g_cfg.light.position.y, 0x1C20);
-    _WriteMem(_g_cfg.light.position.z, 0x1C24);
+    _WriteMem(_g_cfg.light.x_pos, 0x1C1C);
+    _WriteMem(_g_cfg.light.y_pos, 0x1C20);
+    _WriteMem(_g_cfg.light.z_pos, 0x1C24);
 
     // rotation
-    _WriteMem(_g_cfg.light.rotation.x, 0x1C28);
-    _WriteMem(_g_cfg.light.rotation.y, 0x1C2C);
-    _WriteMem(_g_cfg.light.rotation.z, 0x1C30);
+    _WriteMem(_g_cfg.light.x_rot, 0x1C28);
+    _WriteMem(_g_cfg.light.y_rot, 0x1C2C);
+    _WriteMem(_g_cfg.light.z_rot, 0x1C30);
 
     Log("Done.");
     CloseLog();
