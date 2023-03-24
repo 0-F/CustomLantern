@@ -74,16 +74,10 @@ uintptr_t* GetFXRBaseAddress()
     // [process_base_address]+3ABC010 -> 7FF35AB00000
     // [start_address] = 7FF35AB00000
 
-  /*  uintptr_t startAddress = *(uintptr_t*)(_g_pBaseAddress + _g_cfg.ptrOffsetStartAddress);
-    uintptr_t endAddress = startAddress + _g_cfg.maxMemSizeToScan - 16;
-    uintptr_t currentAddress = startAddress;
-    */
-    uintptr_t startAddress = 0;
-    uintptr_t endAddress = 0;
-    uintptr_t currentAddress = startAddress;
+    const unsigned short int LOOP_LIMIT = 9999;
 
-
-    uint64_t* ptrCurrAddr = (uintptr_t*)currentAddress;
+    uintptr_t currentAddress = 0;
+    MEMORY_BASIC_INFORMATION mbi;
 
     // signature to find
     //   46 58 52 00 00 00 05 00
@@ -96,20 +90,49 @@ uintptr_t* GetFXRBaseAddress()
 
     // effect ID = 55 9D 04 00 = 0x00049D55 = 302421
 
-    // find the signature in memory
-    while ((uintptr_t)ptrCurrAddr < endAddress)
+    for (size_t i = 0; i < LOOP_LIMIT; i++)
     {
-        if (*ptrCurrAddr == (uint64_t)0x0005000000525846)
+        if (!VirtualQuery((LPCVOID)currentAddress, &mbi, sizeof(mbi)))
         {
-            if (*(ptrCurrAddr + 1) == (uint64_t)0x00049D5500000001)
+            DWORD error = GetLastError();
+            if (error == ERROR_INVALID_PARAMETER)
             {
-                return ptrCurrAddr;
+                Log("Reached end of scannable memory.");
+            }
+            else
+            {
+                Log("VirtualQuery failed, error code: %i.", error);
+            }
+            break;
+        }
+
+        uintptr_t protection = (uintptr_t)mbi.Protect;
+        uintptr_t state = (uintptr_t)mbi.State;
+
+        if ((mbi.Protect == PAGE_READWRITE) && (mbi.State == MEM_COMMIT))
+        {
+            uintptr_t startAddress = (uintptr_t)mbi.BaseAddress;
+            uintptr_t endAddress = startAddress + mbi.RegionSize - 16;
+            uintptr_t currentAddress = startAddress;
+
+            uintptr_t* ptrCurrAddr = (uintptr_t*)currentAddress;
+
+            // find the signature in memory
+            while ((uintptr_t)ptrCurrAddr < endAddress)
+            {
+                if (*ptrCurrAddr == (uint64_t)0x0005000000525846)
+                {
+                    if (*(ptrCurrAddr + 1) == (uint64_t)0x00049D5500000001)
+                    {
+                        return ptrCurrAddr;
+                    }
+                }
+                ptrCurrAddr++;
             }
         }
-        ptrCurrAddr++;
-    }
 
-    ptrCurrAddr = nullptr;
+        currentAddress += mbi.RegionSize;
+    }
 
     return nullptr;
 }
