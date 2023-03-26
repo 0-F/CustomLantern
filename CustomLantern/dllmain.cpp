@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <chrono>
 #include <windows.h>
 #include "pch.h"
 #include "ModUtils.h" // https://github.com/techiew/EldenRingMods/blob/master/ModUtils.h
@@ -153,7 +154,7 @@ void ReadGeneralConfig(string path)
     // create a data structure
     mINI::INIStructure ini;
 
-    vector<string> keys{ "load_delay", "start_address", "region_size", "protect", "type"};
+    vector<string> keys{ "load_delay", "start_address", "region_size", "protect", "type" };
 
     if (!file.read(ini))
     {
@@ -265,6 +266,8 @@ DWORD WINAPI Patch(LPVOID lpParam)
     Log("Process ID: %i", pid);
     Log("Process base address: 0x%p", _g_pBaseAddress);
 
+    auto chronoStart = chrono::high_resolution_clock::now();
+
     _g_ptrFXRBaseAddress = GetFXRBaseAddress();
     if (!_g_ptrFXRBaseAddress)
     {
@@ -274,7 +277,10 @@ DWORD WINAPI Patch(LPVOID lpParam)
         return 1;
     }
 
-    Log("Found signature at: 0x%p", _g_ptrFXRBaseAddress);
+    auto chronoEnd = chrono::high_resolution_clock::now();
+    chrono::milliseconds duration = chrono::duration_cast<chrono::milliseconds>(chronoEnd - chronoStart);
+
+    Log("Found signature at: 0x%p in %llu milliseconds", _g_ptrFXRBaseAddress, duration.count());
     Log("Write values in memory if any...");
 
     // light color
