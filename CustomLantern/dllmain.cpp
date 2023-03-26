@@ -5,7 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
-
+#include <windows.h>
 #include "pch.h"
 #include "ModUtils.h" // https://github.com/techiew/EldenRingMods/blob/master/ModUtils.h
 #include "ini.h" // https://github.com/pulzed/mINI
@@ -46,9 +46,10 @@ struct cfg {
 
     string load_delay;
 
-    string base_address;
+    string start_address;
     string region_size;
     string protect;
+    string type;
 } _g_cfg;
 
 mINI::INIStructure _g_iniCustomLantern;
@@ -56,64 +57,65 @@ uintptr_t _g_pBaseAddress = 0;
 
 uintptr_t* _g_ptrFXRBaseAddress = nullptr;
 
-void WriteMem(std::string value, std::string paramName, int offset)
+void WriteMem(string value, string paramName, int offset)
 {
     paramName = paramName.replace(0, 7, "");
 
     if (value != "")
     {
-        Log("Write in memory %s value=%s offset=0x%X", paramName.c_str(), value.c_str(), offset);
-        *(float*)((unsigned char*)_g_ptrFXRBaseAddress + offset) = std::stof(value);
+        Log("%s value=%s offset=0x%X", paramName.c_str(), value.c_str(), offset);
+        *(float*)((unsigned char*)_g_ptrFXRBaseAddress + offset) = stof(value);
     }
 }
 
 uintptr_t* GetFXRBaseAddress()
 {
-    // example:
-    // [pointer_offset_start_address] = 3ABC010
-    // [process_base_address]+3ABC010 -> 7FF35AB00000
-    // [start_address] = 7FF35AB00000
+    /*
+        signature to find
+          46 58 52 00 00 00 05 00
+          01 00 00 00 55 9D 04 00
 
-    const unsigned short int LOOP_LIMIT = 9999;
-
-    uintptr_t currentAddress = 0;
-    MEMORY_BASIC_INFORMATION mbi;
-
-    // signature to find
-    //   46 58 52 00 00 00 05 00
-    //   01 00 00 00 55 9D 04 00
-
-    /*				int16 int16 int32       int32
+                    int16 int16 int32       int32
         F  X  R  \0 00 00 ver.  \1          ID
         46 58 52 00 00 00 05 00 01 00 00 00 55 9D 04 00
+
+        effect ID = 55 9D 04 00 = 0x00049D55 = 302421
     */
 
-    // effect ID = 55 9D 04 00 = 0x00049D55 = 302421
+    MEMORY_BASIC_INFORMATION mbi;
 
-    for (size_t i = 0; i < LOOP_LIMIT; i++)
+    uintptr_t startAddress = (_g_cfg.start_address != "") ? stoull(_g_cfg.start_address, 0, 16) : 0;
+    uintptr_t regionSize = (_g_cfg.region_size != "") ? stoull(_g_cfg.region_size, 0, 16) : 0;
+    DWORD protect = (_g_cfg.protect != "") ? stoul(_g_cfg.protect, 0, 16) : PAGE_READWRITE;
+    DWORD type = (_g_cfg.type != "") ? stoul(_g_cfg.type, 0, 16) : MEM_PRIVATE;
+
+    Log("Find the signature in memory");
+    Log("start_address=0x%p", startAddress);
+    Log("region_size=0x%p", regionSize);
+    Log("protect=0x%X", protect);
+    Log("type=0x%X", type);
+
+    uintptr_t currentAddress = startAddress;
+
+    for (size_t i = 0; i < 0xFFFF; i++)
     {
         if (!VirtualQuery((LPCVOID)currentAddress, &mbi, sizeof(mbi)))
         {
             DWORD error = GetLastError();
-            if (error == ERROR_INVALID_PARAMETER)
-            {
-                Log("Reached end of scannable memory.");
-            }
-            else
-            {
-                Log("VirtualQuery failed, error code: %i.", error);
-            }
+            if (error == ERROR_INVALID_PARAMETER) { break; }
+
+            RaiseError("VirtualQuery() failed with error " + error);
             break;
         }
 
-        uintptr_t protection = (uintptr_t)mbi.Protect;
-        uintptr_t state = (uintptr_t)mbi.State;
-
-        if ((mbi.Protect == PAGE_READWRITE) && (mbi.State == MEM_COMMIT))
+        if ((protect == 0 || mbi.Protect == protect) &&
+            (type == 0 || mbi.Type == type) &&
+            (regionSize == 0 || mbi.RegionSize == regionSize) &&
+            (mbi.State == MEM_COMMIT))
         {
-            uintptr_t startAddress = (uintptr_t)mbi.BaseAddress;
-            uintptr_t endAddress = startAddress + mbi.RegionSize - 16;
-            uintptr_t currentAddress = startAddress;
+            uintptr_t baseAddress = (uintptr_t)mbi.BaseAddress;
+            uintptr_t endAddress = baseAddress + mbi.RegionSize - 16;
+            uintptr_t currentAddress = baseAddress;
 
             uintptr_t* ptrCurrAddr = (uintptr_t*)currentAddress;
 
@@ -151,7 +153,7 @@ void ReadGeneralConfig(string path)
     // create a data structure
     mINI::INIStructure ini;
 
-    vector<string> keys{ "load_delay", "base_address", "region_size", "protect" };
+    vector<string> keys{ "load_delay", "start_address", "region_size", "protect", "type"};
 
     if (!file.read(ini))
     {
@@ -167,9 +169,10 @@ void ReadGeneralConfig(string path)
 
     // read values
     GetGeneralConfig(load_delay);
-    GetGeneralConfig(base_address);
+    GetGeneralConfig(start_address);
     GetGeneralConfig(region_size);
     GetGeneralConfig(protect);
+    GetGeneralConfig(type);
 
     // write ini
     file.write(ini);
@@ -232,7 +235,7 @@ void ReadLightConfig(string path)
 
 void ReadConfig()
 {
-    Log("Read configuration...");
+    Log("Read configuration");
 
     const string CONFIG = "config";
 
@@ -251,12 +254,9 @@ DWORD WINAPI Patch(LPVOID lpParam)
 
     ReadConfig();
 
-    if (_g_cfg.load_delay != "")
-    {
-        unsigned long loadDelay = stol(_g_cfg.load_delay);
-        Log("Wait %lu ms...", loadDelay);
-        Sleep(loadDelay);
-    }
+    unsigned long loadDelay = (_g_cfg.load_delay != "") ? stoul(_g_cfg.load_delay) : 15000;
+    Log("Wait %lu ms", loadDelay);
+    Sleep(loadDelay);
 
     DWORD pid = GetCurrentProcessId();
     _g_pBaseAddress = GetProcessBaseAddress(pid);
@@ -268,13 +268,13 @@ DWORD WINAPI Patch(LPVOID lpParam)
     _g_ptrFXRBaseAddress = GetFXRBaseAddress();
     if (!_g_ptrFXRBaseAddress)
     {
-        RaiseError("Unable to find the FXR base address.");
+        RaiseError("Unable to find the signature in memory");
         CloseLog();
 
         return 1;
     }
 
-    Log("FXR base address: 0x%p", _g_ptrFXRBaseAddress);
+    Log("Found signature at: 0x%p", _g_ptrFXRBaseAddress);
     Log("Write values in memory if any...");
 
     // light color
@@ -305,7 +305,7 @@ DWORD WINAPI Patch(LPVOID lpParam)
     _WriteMem(_g_cfg.light.y_rot, 0x1C2C);
     _WriteMem(_g_cfg.light.z_rot, 0x1C30);
 
-    Log("Done.");
+    Log("Patch applied (^.^)/ ");
     CloseLog();
 
     return 0;
