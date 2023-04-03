@@ -1,0 +1,243 @@
+﻿<Window x:Class="CustomLanternTester.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CustomLanternTester"
+        xmlns:colorpicker="clr-namespace:ColorPicker;assembly=ColorPicker"
+        mc:Ignorable="d"
+        Title="Custom Lantern tester" SizeToContent="WidthAndHeight" ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen">
+    <StackPanel Margin="5,5,5,5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <Label Content="Light color" Grid.Row="0" Grid.Column="0" FontWeight="Bold"/>
+            <Label Content="Specular light color" Grid.Row="0" Grid.Column="1" FontWeight="Bold"/>
+            <colorpicker:StandardColorPicker x:Name="Colorpicker" Grid.Row="1" Grid.Column="0" Width="200" Height="380"/>
+            <colorpicker:StandardColorPicker x:Name="SpColorpicker" Grid.Row="1" Grid.Column="1 " Width="200" Height="380"/>
+
+            <Grid Grid.Row="2" Grid.RowSpan="1" Grid.ColumnSpan="2">
+                <StackPanel>
+                    <GroupBox Header="Color temperature in Kelvin">
+                        <StackPanel>
+                            <DockPanel>
+                                <Label Content="Temperature"/>
+                                <TextBox x:Name="TextBoxSetKelvin" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                     ToolTip="You can enter a Kelvin temperature (between 1000 K and 40000 K)."
+                                     Width="80" LostFocus="TextBoxSetKelvin_LostFocus" KeyDown="TextBoxSetKelvin_KeyDown"/>
+                                <Button x:Name="ButtonApplySetKelvin" Content="Apply" Margin="5,0,0,0" Click="ButtonApplySetKelvin_Click" 
+                                        Padding="10,1,10,1" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <DockPanel>
+                                <Slider x:Name="SliderKelvin" Minimum="1000" Maximum="11000" Width="345" 
+                                    TickFrequency="10" IsSnapToTickEnabled="True"
+                                    ValueChanged="SliderKelvin_ValueChanged"
+                                        ToolTip="Slider from 1000 K to 11000 K." Value="4500">
+                                    <Slider.Background>
+                                        <ImageBrush ImageSource="/kevlin-temperature.png" TileMode="None" Stretch="Fill"/>
+                                    </Slider.Background>
+                                </Slider>
+                                <TextBox x:Name="TextBoxKelvin" MaxLength="5"
+                                 IsReadOnly="True"
+                                 Text="{Binding Value, ElementName=SliderKelvin, Mode=OneWay}" Width="44" Margin="5,0,0,0">
+                                    <TextBox.Background>
+                                        <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}"/>
+                                    </TextBox.Background>
+                                </TextBox>
+                                <Button x:Name="ButtonApplySetKelvinFromSlider" Content="Apply" Click="ButtonApplySetKelvinFromSlider_Click" 
+                                    Padding="10,1,10,1" HorizontalAlignment="Right"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </GroupBox>
+                    <StackPanel>
+                        <GroupBox Grid.Row="0" Header="Light values"
+                  ToolTip="Press `ENTER` in a `TextBox` or click `Apply` to validate. Press `TAB` to navigate between textboxes.">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition></ColumnDefinition>
+                                        <ColumnDefinition></ColumnDefinition>
+                                        <ColumnDefinition></ColumnDefinition>
+                                        <ColumnDefinition></ColumnDefinition>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <DockPanel ToolTip="Red color">
+                                            <Label Content="R"/>
+                                            <TextBox x:Name="TextBoxR" VerticalAlignment="Center" KeyDown="TextBoxR_KeyDown"/>
+                                        </DockPanel>
+                                        <DockPanel ToolTip="Green color">
+                                            <Label Content="G"></Label>
+                                            <TextBox x:Name="TextBoxG" VerticalAlignment="Center" KeyDown="TextBoxG_KeyDown"/>
+                                        </DockPanel>
+                                        <DockPanel ToolTip="Blue color">
+                                            <Label Content="B"></Label>
+                                            <TextBox x:Name="TextBoxB" VerticalAlignment="Center" KeyDown="TextBoxB_KeyDown"/>
+                                        </DockPanel>
+                                        <DockPanel ToolTip="Alpha color">
+                                            <Label Content="A"></Label>
+                                            <TextBox x:Name="TextBoxA" VerticalAlignment="Center" KeyDown="TextBoxA_KeyDown"/>
+                                        </DockPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <DockPanel ToolTip="Red specular color">
+                                            <Label Content="R"></Label>
+                                            <TextBox x:Name="TextBoxSpR" VerticalAlignment="Center" KeyDown="TextBoxSpR_KeyDown"/>
+                                        </DockPanel>
+                                        <DockPanel ToolTip="Green specular color">
+                                            <Label Content="G"></Label>
+                                            <TextBox x:Name="TextBoxSpG" VerticalAlignment="Center" KeyDown="TextBoxSpG_KeyDown"/>
+                                        </DockPanel>
+                                        <DockPanel ToolTip="Blue specular color">
+                                            <Label Content="B"></Label>
+                                            <TextBox x:Name="TextBoxSpB" VerticalAlignment="Center" KeyDown="TextBoxSpB_KeyDown"/>
+                                        </DockPanel>
+                                        <DockPanel ToolTip="Alpha specular color">
+                                            <Label Content="A"></Label>
+                                            <TextBox x:Name="TextBoxSpA" VerticalAlignment="Center" KeyDown="TextBoxSpA_KeyDown"/>
+                                        </DockPanel>
+
+                                    </StackPanel>
+
+                                    <StackPanel  Grid.Column="2">
+                                        <DockPanel>
+                                            <Label Content="X"></Label>
+                                            <TextBox x:Name="TextBoxX" VerticalAlignment="Center" KeyDown="TextBoxX_KeyDown"/>
+                                        </DockPanel>
+                                        <DockPanel Grid.Column="1">
+                                            <Label Content="Y"></Label>
+                                            <TextBox x:Name="TextBoxY" VerticalAlignment="Center" KeyDown="TextBoxY_KeyDown"/>
+                                        </DockPanel>
+                                        <DockPanel Grid.Column="2">
+                                            <Label Content="Z"></Label>
+                                            <TextBox x:Name="TextBoxZ" VerticalAlignment="Center" KeyDown="TextBoxZ_KeyDown"/>
+                                        </DockPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="3">
+
+                                        <DockPanel>
+                                            <Label Content="Radius"></Label>
+                                            <TextBox x:Name="TextBoxRadius" VerticalAlignment="Center" 
+                                                  KeyDown="TextBoxRadius_KeyDown" Width="45" HorizontalAlignment="Right"/>
+                                        </DockPanel>
+                                        <DockPanel>
+                                            <Label Content="Luminous intensity"></Label>
+                                            <TextBox x:Name="TextBoxIntensity" VerticalAlignment="Center"
+                                                  KeyDown="TextBoxIntensity_KeyDown" Width="45" HorizontalAlignment="Right"/>
+                                        </DockPanel>
+
+
+                                    </StackPanel>
+
+
+                                </Grid>
+
+                                <Grid Margin="0,5,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition></ColumnDefinition>
+                                        <ColumnDefinition></ColumnDefinition>
+                                        <ColumnDefinition></ColumnDefinition>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="ButtonRefresh" Grid.Column="0" Content="Refresh" Click="ButtonRefresh_Click" 
+                                            ToolTip="Read all values from the game process memory. `Synchronize color pickers` will be unchecked."/>
+                                    <Button x:Name="ButtonApplyWriteMemory" Grid.Column="1" Content="Apply"
+                                            ToolTip="Write these values to the game process memory." Click="ButtonApplyWriteMemory_Click" Margin="5,0,5,0"/>
+                                    <Button x:Name="ButtonCopyToClipboard" Grid.Column="2" Content="Copy to clipboard" Click="ButtonCopyToClipboard_Click" 
+                                            ToolTip="Read all values from the game process memory and copy them to the clipboard. Then you can paste copied values in `custom_lantern.ini`."/>
+                                </Grid>
+
+                            </StackPanel>
+
+                        </GroupBox>
+
+
+
+
+
+
+
+                    </StackPanel>
+
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <DockPanel>
+
+            <GroupBox Header="FXR base address" Grid.Column="0"
+                      ToolTip="Launch Elden Ring, wait for the game menu to load before attempting to find the address.">
+                <DockPanel Margin="0,5,0,0">
+                    <TextBox x:Name="TextBoxBaseAddr" Text="0xFFFFFFFFFFFFFFFF" IsReadOnly="True" Foreground="Red" Width="120">
+                        <TextBox.Background>
+                            <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}"/>
+                        </TextBox.Background>
+                    </TextBox>
+                    <Button x:Name="ButtonBaseAddr" Content="Find address" Click="ButtonBaseAddr_Click" Padding="10,1,10,1" Margin="5,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                </DockPanel>
+            </GroupBox>
+
+            <GroupBox Header="Options" Grid.Column="1">
+                <CheckBox x:Name="CheckBoxSync" Content="Synchronize color pickers" Checked="CheckBoxSync_Checked"
+                      Unchecked="CheckBoxSync_Unchecked"
+                      ToolTip="Synchronize the `light color` with the `specular light color`." IsChecked="True" Margin="0,5,0,0"/>
+            </GroupBox>
+
+        </DockPanel>
+
+
+
+        <GroupBox Header="Saved light sources" ToolTip="Saved light sources from INI file.">
+            <StackPanel>
+                <GroupBox Header="Filter" ToolTip="Only load checked values.">
+                    <DockPanel>
+                        <CheckBox x:Name="FilterR" IsChecked="True" Content="R" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterG" IsChecked="True" Content="G" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterB" IsChecked="True" Content="B" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterA" IsChecked="True" Content="A" Padding="0,-1,5,0"/>
+
+                        <CheckBox x:Name="FilterSpR" IsChecked="True" Content="R" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterSpG" IsChecked="True" Content="G" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterSpB" IsChecked="True" Content="B" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterSpA" IsChecked="True" Content="A" Padding="0,-1,5,0"/>
+
+
+                        <CheckBox x:Name="FilterX" IsChecked="True" Content="X" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterY" IsChecked="True" Content="Y" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterZ" IsChecked="True" Content="Z" Padding="0,-1,5,0"/>
+
+                        <CheckBox x:Name="FilterRadius" IsChecked="True" Content="Radius" Padding="0,-1,5,0"/>
+                        <CheckBox x:Name="FilterIntensity" IsChecked="True" Content="Intensity" Padding="0,-1,5,0"/>
+                    </DockPanel>
+                </GroupBox>
+                <DockPanel>
+                    <ComboBox x:Name="SavedLightSources" SelectionChanged="SavedLightSources_SelectionChanged" 
+                      Height="24" TabIndex="0" Width="400" Margin="0,5,0,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Rectangle Fill="{Binding HexColor}" 
+                                       Width="24" Height="24" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                    <Rectangle Fill="{Binding HexSpColor}"
+                                       Width="24" Height="24" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Name}" Margin="0,0,5,0" VerticalAlignment="Center" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Comment}" VerticalAlignment="Center" FontStyle="Italic"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button x:Name="ButtonLoadLightSource" Content="Load" Margin="5,0,0,0" 
+                            Padding="10,1,10,1" VerticalAlignment="Bottom" Height="24" 
+                            Click="ButtonLoadLightSource_Click"/>
+                </DockPanel>
+            </StackPanel>
+        </GroupBox>
+    </StackPanel>
+</Window>
