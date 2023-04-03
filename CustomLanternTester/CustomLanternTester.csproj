@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <ApplicationIcon>ER_EXE_Icon_Lantern.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="kevlin-temperature.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="ER_EXE_Icon_Lantern.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ini-parser-netcore3.1" Version="3.0.0" />
+    <PackageReference Include="PixiEditor.ColorPicker" Version="3.3.1" />
+    <PackageReference Include="ProcessMemoryUtilities.Net" Version="1.3.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="kevlin-temperature.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="custom-lantern-tester.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+</Project>
