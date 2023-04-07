@@ -33,16 +33,17 @@ struct cfg {
 
         string radius; // 16.0
 
-        string luminous_intensity; // 1.25
+        string intensity; // 1.25
 
+        string x; // 0.0
+        string y; // 0.0
+        string z; // 0.0
+
+        // deprecated
+        string luminous_intensity; // 1.25
         string x_pos; // 0.0
         string y_pos; // 0.0
         string z_pos; // 0.0
-
-        string x_rot; // 0.0
-        string y_rot; // 0.0
-        string z_rot; // 0.0
-
     } light;
 
     string load_delay;
@@ -196,9 +197,8 @@ void ReadLightConfig(string path)
     vector<string> keys{
         "red", "green", "blue", "alpha",
         "sp_red", "sp_green", "sp_blue", "sp_alpha",
-        "radius", "luminous_intensity",
-        "x_pos", "y_pos", "z_pos",
-        "x_rot", "y_rot", "z_rot" };
+        "radius", "intensity",
+        "x", "y", "z" };
 
     if (!file.read(ini))
     {
@@ -222,16 +222,19 @@ void ReadLightConfig(string path)
     GetLightConfig(sp_blue);
     GetLightConfig(sp_alpha);
     GetLightConfig(radius);
+    GetLightConfig(intensity);
+    GetLightConfig(x);
+    GetLightConfig(y);
+    GetLightConfig(z);
+
+    // write ini
+    file.write(ini);
+
+    // deprecated
     GetLightConfig(luminous_intensity);
     GetLightConfig(x_pos);
     GetLightConfig(y_pos);
     GetLightConfig(z_pos);
-    GetLightConfig(x_rot);
-    GetLightConfig(y_rot);
-    GetLightConfig(z_rot);
-
-    // write ini
-    file.write(ini);
 }
 
 void ReadConfig()
@@ -299,17 +302,18 @@ DWORD WINAPI Patch(LPVOID lpParam)
     _WriteMem(_g_cfg.light.radius, 0x1CFC);
 
     // luminous intensity
-    _WriteMem(_g_cfg.light.luminous_intensity, 0x1D0C);
+    _WriteMem(_g_cfg.light.intensity, 0x1D0C);
 
     // position
-    _WriteMem(_g_cfg.light.x_pos, 0x1C1C);
-    _WriteMem(_g_cfg.light.y_pos, 0x1C20);
-    _WriteMem(_g_cfg.light.z_pos, 0x1C24);
+    _WriteMem(_g_cfg.light.x, 0x1C1C);
+    _WriteMem(_g_cfg.light.y, 0x1C20);
+    _WriteMem(_g_cfg.light.z, 0x1C24);
 
-    // rotation
-    _WriteMem(_g_cfg.light.x_rot, 0x1C28);
-    _WriteMem(_g_cfg.light.y_rot, 0x1C2C);
-    _WriteMem(_g_cfg.light.z_rot, 0x1C30);
+    // deprecated
+    if (_g_cfg.light.intensity == "") { _WriteMem(_g_cfg.light.luminous_intensity, 0x1D0C); } // luminous_intensity deprecated
+    if (_g_cfg.light.x == "") { _WriteMem(_g_cfg.light.x_pos, 0x1C1C); } // x_pos deprecated
+    if (_g_cfg.light.y == "") { _WriteMem(_g_cfg.light.y_pos, 0x1C20); } // y_pos deprecated
+    if (_g_cfg.light.z == "") { _WriteMem(_g_cfg.light.z_pos, 0x1C24); } // z_pos deprecated
 
     Log("Patch applied (^.^)/ ");
     CloseLog();
