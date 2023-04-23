@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ConsoleApp1": {
+      "commandName": "Project",
+      "commandLineArgs": "-c \"$(SolutionDir)samples\\config.ini\" -cl \"$(SolutionDir)samples\\custom-lantern-test.ini\" -i \"$(SolutionDir)samples\\sfxbnd_commoneffects.ffxbnd.dcx\" -o \"$(SolutionDir)samples\\out_sfxbnd_commoneffects.ffxbnd.dcx\""
+    }
+  }
+}
