@@ -1,0 +1,4 @@
+[submodule "lib/SoulsFormats"]
+	path = lib/SoulsFormats
+	url = https://github.com/kotn3l/SoulsFormats.git
+	branch = everything
