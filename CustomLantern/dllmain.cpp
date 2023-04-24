@@ -52,6 +52,7 @@ struct cfg {
     string region_size;
     string protect;
     string type;
+    string filename;
 } _g_cfg;
 
 mINI::INIStructure _g_iniCustomLantern;
@@ -155,7 +156,7 @@ void ReadGeneralConfig(string path)
     // create a data structure
     mINI::INIStructure ini;
 
-    vector<string> keys{ "load_delay", "start_address", "region_size", "protect", "type" };
+    vector<string> keys{ "load_delay", "start_address", "region_size", "protect", "type", "filename" };
 
     if (!file.read(ini))
     {
@@ -175,6 +176,13 @@ void ReadGeneralConfig(string path)
     GetGeneralConfig(region_size);
     GetGeneralConfig(protect);
     GetGeneralConfig(type);
+    GetGeneralConfig(filename);
+
+    if (_g_cfg.filename.empty())
+    {
+        _g_cfg.filename = "custom-lantern.ini";
+        ini[SECTION]["filename"] = _g_cfg.filename;
+    }
 
     // write ini
     file.write(ini);
@@ -183,13 +191,13 @@ void ReadGeneralConfig(string path)
 void ReadLightConfig(string path)
 {
     //
-    // custom-lantern.ini
+    // custom-lantern.ini (by default)
     //
 
     const string SECTION = "config";
 
     // create a file instance
-    mINI::INIFile file(path + "\\custom-lantern.ini");
+    mINI::INIFile file(path + "\\" + _g_cfg.filename);
 
     // create a data structure
     mINI::INIStructure ini;
