@@ -12,8 +12,8 @@
 #include "ini.h" // https://github.com/pulzed/mINI
 
 #define _WriteMem(param, offset) WriteMem(param, #param, offset)
-#define GetGeneralConfig(key) _g_cfg.key = ini[SECTION][#key]
-#define GetLightConfig(key) _g_cfg.light.key = ini[SECTION][#key]
+#define GetGeneralConfig(key) cfg.key = ini[SECTION][#key]
+#define GetLightConfig(key) cfg.light.key = ini[SECTION][#key]
 
 using namespace ModUtils;
 using namespace std;
@@ -53,12 +53,11 @@ struct cfg {
     string protect;
     string type;
     string filename;
-} _g_cfg;
+} cfg;
 
-mINI::INIStructure _g_iniCustomLantern;
-uintptr_t _g_pBaseAddress = 0;
+uintptr_t pBaseAddress = 0;
 
-uintptr_t* _g_ptrFXRBaseAddress = nullptr;
+uintptr_t* ptrFXRBaseAddress = nullptr;
 
 void WriteMem(string value, string paramName, int offset)
 {
@@ -67,7 +66,7 @@ void WriteMem(string value, string paramName, int offset)
     if (value != "")
     {
         Log("%s value=%s offset=0x%X", paramName.c_str(), value.c_str(), offset);
-        *(float*)((unsigned char*)_g_ptrFXRBaseAddress + offset) = stof(value);
+        *(float*)((unsigned char*)ptrFXRBaseAddress + offset) = stof(value);
     }
 }
 
@@ -87,10 +86,10 @@ uintptr_t* GetFXRBaseAddress()
 
     MEMORY_BASIC_INFORMATION mbi;
 
-    uintptr_t startAddress = (_g_cfg.start_address != "") ? stoull(_g_cfg.start_address, 0, 16) : 0;
-    uintptr_t regionSize = (_g_cfg.region_size != "") ? stoull(_g_cfg.region_size, 0, 16) : 0;
-    DWORD protect = (_g_cfg.protect != "") ? stoul(_g_cfg.protect, 0, 16) : PAGE_READWRITE;
-    DWORD type = (_g_cfg.type != "") ? stoul(_g_cfg.type, 0, 16) : MEM_PRIVATE;
+    uintptr_t startAddress = (cfg.start_address != "") ? stoull(cfg.start_address, 0, 16) : 0;
+    uintptr_t regionSize = (cfg.region_size != "") ? stoull(cfg.region_size, 0, 16) : 0;
+    DWORD protect = (cfg.protect != "") ? stoul(cfg.protect, 0, 16) : PAGE_READWRITE;
+    DWORD type = (cfg.type != "") ? stoul(cfg.type, 0, 16) : MEM_PRIVATE;
 
     Log("Find the signature in memory");
     Log("start_address=0x%p", startAddress);
@@ -178,10 +177,10 @@ void ReadGeneralConfig(string path)
     GetGeneralConfig(type);
     GetGeneralConfig(filename);
 
-    if (_g_cfg.filename.empty())
+    if (cfg.filename.empty())
     {
-        _g_cfg.filename = "custom-lantern.ini";
-        ini[SECTION]["filename"] = _g_cfg.filename;
+        cfg.filename = "custom-lantern.ini";
+        ini[SECTION]["filename"] = cfg.filename;
     }
 
     // write ini
@@ -197,7 +196,7 @@ void ReadLightConfig(string path)
     const string SECTION = "config";
 
     // create a file instance
-    mINI::INIFile file(path + "\\" + _g_cfg.filename);
+    mINI::INIFile file(path + "\\" + cfg.filename);
 
     // create a data structure
     mINI::INIStructure ini;
@@ -266,21 +265,21 @@ DWORD WINAPI Patch(LPVOID lpParam)
 
     ReadConfig();
 
-    unsigned long loadDelay = (_g_cfg.load_delay != "") ? stoul(_g_cfg.load_delay) : 15000;
+    unsigned long loadDelay = (cfg.load_delay != "") ? stoul(cfg.load_delay) : 15000;
     Log("Wait %lu ms", loadDelay);
     Sleep(loadDelay);
 
     DWORD pid = GetCurrentProcessId();
-    _g_pBaseAddress = GetProcessBaseAddress(pid);
+    pBaseAddress = GetProcessBaseAddress(pid);
 
     Log("Process name: %s", GetModuleName(false).c_str());
     Log("Process ID: %i", pid);
-    Log("Process base address: 0x%p", _g_pBaseAddress);
+    Log("Process base address: 0x%p", pBaseAddress);
 
     auto chronoStart = chrono::high_resolution_clock::now();
 
-    _g_ptrFXRBaseAddress = GetFXRBaseAddress();
-    if (!_g_ptrFXRBaseAddress)
+    ptrFXRBaseAddress = GetFXRBaseAddress();
+    if (!ptrFXRBaseAddress)
     {
         RaiseError("Unable to find the signature in memory");
         CloseLog();
@@ -291,37 +290,37 @@ DWORD WINAPI Patch(LPVOID lpParam)
     auto chronoEnd = chrono::high_resolution_clock::now();
     chrono::milliseconds duration = chrono::duration_cast<chrono::milliseconds>(chronoEnd - chronoStart);
 
-    Log("Found signature at: 0x%p in %llu milliseconds", _g_ptrFXRBaseAddress, duration.count());
+    Log("Found signature at: 0x%p in %llu milliseconds", ptrFXRBaseAddress, duration.count());
     Log("Write values in memory if any...");
 
     // light color
-    _WriteMem(_g_cfg.light.red, 0x1CDC);
-    _WriteMem(_g_cfg.light.green, 0x1CE0);
-    _WriteMem(_g_cfg.light.blue, 0x1CE4);
-    _WriteMem(_g_cfg.light.alpha, 0x1CE8);
+    _WriteMem(cfg.light.red, 0x1CDC);
+    _WriteMem(cfg.light.green, 0x1CE0);
+    _WriteMem(cfg.light.blue, 0x1CE4);
+    _WriteMem(cfg.light.alpha, 0x1CE8);
 
     // specular color
-    _WriteMem(_g_cfg.light.sp_red, 0x1CEC);
-    _WriteMem(_g_cfg.light.sp_green, 0x1CF0);
-    _WriteMem(_g_cfg.light.sp_blue, 0x1CF4);
-    _WriteMem(_g_cfg.light.sp_alpha, 0x1CF8);
+    _WriteMem(cfg.light.sp_red, 0x1CEC);
+    _WriteMem(cfg.light.sp_green, 0x1CF0);
+    _WriteMem(cfg.light.sp_blue, 0x1CF4);
+    _WriteMem(cfg.light.sp_alpha, 0x1CF8);
 
     // light radius
-    _WriteMem(_g_cfg.light.radius, 0x1CFC);
+    _WriteMem(cfg.light.radius, 0x1CFC);
 
     // luminous intensity
-    _WriteMem(_g_cfg.light.intensity, 0x1D0C);
+    _WriteMem(cfg.light.intensity, 0x1D0C);
 
     // position
-    _WriteMem(_g_cfg.light.x, 0x1C1C);
-    _WriteMem(_g_cfg.light.y, 0x1C20);
-    _WriteMem(_g_cfg.light.z, 0x1C24);
+    _WriteMem(cfg.light.x, 0x1C1C);
+    _WriteMem(cfg.light.y, 0x1C20);
+    _WriteMem(cfg.light.z, 0x1C24);
 
     // deprecated
-    if (_g_cfg.light.intensity == "") { _WriteMem(_g_cfg.light.luminous_intensity, 0x1D0C); } // luminous_intensity deprecated
-    if (_g_cfg.light.x == "") { _WriteMem(_g_cfg.light.x_pos, 0x1C1C); } // x_pos deprecated
-    if (_g_cfg.light.y == "") { _WriteMem(_g_cfg.light.y_pos, 0x1C20); } // y_pos deprecated
-    if (_g_cfg.light.z == "") { _WriteMem(_g_cfg.light.z_pos, 0x1C24); } // z_pos deprecated
+    if (cfg.light.intensity == "") { _WriteMem(cfg.light.luminous_intensity, 0x1D0C); } // luminous_intensity deprecated
+    if (cfg.light.x == "") { _WriteMem(cfg.light.x_pos, 0x1C1C); } // x_pos deprecated
+    if (cfg.light.y == "") { _WriteMem(cfg.light.y_pos, 0x1C20); } // y_pos deprecated
+    if (cfg.light.z == "") { _WriteMem(cfg.light.z_pos, 0x1C24); } // z_pos deprecated
 
     Log("Patch applied (^.^)/ ");
     CloseLog();
