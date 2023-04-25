@@ -302,7 +302,7 @@ void ReadConfig()
     ReadLightConfig(path);
 }
 
-DWORD WINAPI Patch(LPVOID lpParam)
+DWORD WINAPI Patch(LPVOID hModule)
 {
     Log("Activating Custom Lantern...");
 
@@ -371,6 +371,9 @@ DWORD WINAPI Patch(LPVOID lpParam)
     Log("Patch applied (^.^)/ ");
     CloseLog();
 
+    // unload DLL
+    FreeLibraryAndExitThread((HMODULE)hModule, 0);
+
     return 0;
 }
 
@@ -384,12 +387,11 @@ BOOL APIENTRY DllMain(
     {
     case DLL_PROCESS_ATTACH:
         DisableThreadLibraryCalls(hModule);
-        CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Patch, 0, 0, NULL);
-        break;
-    case DLL_THREAD_ATTACH:
-    case DLL_THREAD_DETACH:
-    case DLL_PROCESS_DETACH:
-        break;
+        HANDLE hThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)Patch, hModule, 0, nullptr);
+        if (hThread)
+        {
+            CloseHandle(hThread);
+        }
     }
     return TRUE;
 }
