@@ -18,6 +18,15 @@
 using namespace ModUtils;
 using namespace std;
 
+struct offsets
+{
+    int color;
+    int sp_color;
+    int radius;
+    int intensity;
+    int position;
+} offsets;
+
 struct cfg {
     struct light // comments = default values
     {
@@ -59,9 +68,43 @@ uintptr_t pBaseAddress = 0;
 
 uintptr_t* ptrFXRBaseAddress = nullptr;
 
+void GetOffsets()
+{
+    // The offset of the second "55 9D 04 00" in the FXR is different if the FXR was written by SoulsFormats.
+    // Others offsets are also different in this case.
+
+    // FXRBaseAddress+0x1D84 = 55 9D 04 00
+    // NON modded FXR
+    if (*(uint32_t*)((unsigned char*)ptrFXRBaseAddress + 0x1D84) == (uint32_t)0x00049D55)
+    {
+        offsets.color = 0x1CDC;
+        offsets.position = 0x1C1C;
+        Log("FXR seems to be original.");
+    }
+    // FXRBaseAddress+0x1C0C = 55 9D 04 00
+    // modded FXR
+    else if (*(uint32_t*)((unsigned char*)ptrFXRBaseAddress + 0x1C0C) == (uint32_t)0x00049D55)
+    {
+        offsets.color = 0x1D50;
+        offsets.position = 0x1C58;
+        Log("FXR seems to be modded by a third-party mod.");
+    }
+    else
+    {
+        offsets.color = 0x1CDC;
+        offsets.position = 0x1C1C;
+        Log("Unable to find the second signature in memory. The mod may not work properly. Are you using a third-party mod?");
+    }
+
+    offsets.sp_color = offsets.color + 0x10;
+    offsets.radius = offsets.color + 0x20;
+    offsets.intensity = offsets.color + 0x30;
+}
+
 void WriteMem(string value, string paramName, int offset)
 {
-    paramName = paramName.replace(0, 7, "");
+    // replace "cfg.light." by "";
+    paramName = paramName.replace(0, 10, "");
 
     if (value != "")
     {
@@ -281,7 +324,7 @@ DWORD WINAPI Patch(LPVOID lpParam)
     ptrFXRBaseAddress = GetFXRBaseAddress();
     if (!ptrFXRBaseAddress)
     {
-        RaiseError("Unable to find the signature in memory");
+        RaiseError("Unable to find the signature in memory. Read the full logs in Game\\mods\\CustomLantern\\log.txt");
         CloseLog();
 
         return 1;
@@ -291,30 +334,33 @@ DWORD WINAPI Patch(LPVOID lpParam)
     chrono::milliseconds duration = chrono::duration_cast<chrono::milliseconds>(chronoEnd - chronoStart);
 
     Log("Found signature at: 0x%p in %llu milliseconds", ptrFXRBaseAddress, duration.count());
+
+    GetOffsets();
+
     Log("Write values in memory if any...");
 
     // light color
-    _WriteMem(cfg.light.red, 0x1CDC);
-    _WriteMem(cfg.light.green, 0x1CE0);
-    _WriteMem(cfg.light.blue, 0x1CE4);
-    _WriteMem(cfg.light.alpha, 0x1CE8);
+    _WriteMem(cfg.light.red, offsets.color);
+    _WriteMem(cfg.light.green, offsets.color + 4);
+    _WriteMem(cfg.light.blue, offsets.color + 8);
+    _WriteMem(cfg.light.alpha, offsets.color + 12);
 
     // specular color
-    _WriteMem(cfg.light.sp_red, 0x1CEC);
-    _WriteMem(cfg.light.sp_green, 0x1CF0);
-    _WriteMem(cfg.light.sp_blue, 0x1CF4);
-    _WriteMem(cfg.light.sp_alpha, 0x1CF8);
+    _WriteMem(cfg.light.sp_red, offsets.sp_color);
+    _WriteMem(cfg.light.sp_green, offsets.sp_color + 4);
+    _WriteMem(cfg.light.sp_blue, offsets.sp_color + 8);
+    _WriteMem(cfg.light.sp_alpha, offsets.sp_color + 12);
 
     // light radius
-    _WriteMem(cfg.light.radius, 0x1CFC);
+    _WriteMem(cfg.light.radius, offsets.radius);
 
     // luminous intensity
-    _WriteMem(cfg.light.intensity, 0x1D0C);
+    _WriteMem(cfg.light.intensity, offsets.intensity);
 
     // position
-    _WriteMem(cfg.light.x, 0x1C1C);
-    _WriteMem(cfg.light.y, 0x1C20);
-    _WriteMem(cfg.light.z, 0x1C24);
+    _WriteMem(cfg.light.x, offsets.position);
+    _WriteMem(cfg.light.y, offsets.position + 4);
+    _WriteMem(cfg.light.z, offsets.position + 8);
 
     // deprecated
     if (cfg.light.intensity == "") { _WriteMem(cfg.light.luminous_intensity, 0x1D0C); } // luminous_intensity deprecated
