@@ -182,8 +182,7 @@ namespace CustomLanternTester
                     return IntPtr.Zero;
                 }
 
-                if (mbi.RegionSize == REGION_SIZE &&
-                    mbi.Protect == PAGE_READWRITE &&
+                if (mbi.Protect == PAGE_READWRITE &&
                     mbi.State == MEM_COMMIT &&
                     mbi.Type == MEM_PRIVATE)
                 {
