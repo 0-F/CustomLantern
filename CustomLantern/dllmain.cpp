@@ -155,7 +155,6 @@ uintptr_t* GetFXRBaseAddress()
 
         if ((protect == 0 || mbi.Protect == protect) &&
             (type == 0 || mbi.Type == type) &&
-            (regionSize == 0 || mbi.RegionSize == regionSize) &&
             (mbi.State == MEM_COMMIT))
         {
             uintptr_t baseAddress = (uintptr_t)mbi.BaseAddress;
