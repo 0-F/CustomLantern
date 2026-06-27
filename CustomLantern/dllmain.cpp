@@ -1,22 +1,26 @@
 /*
-    Custom Lantern -- Elden Ring 1.8.1
+    Custom Lantern -- Elden Ring
 */
 
+#include "pch.h"
+
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <string>
 #include <chrono>
 #include <windows.h>
-#include "pch.h"
 #include "ModUtils.h" // https://github.com/techiew/EldenRingMods/blob/master/ModUtils.h
-#include "ini.h" // https://github.com/pulzed/mINI
+#include "ini.h" // https://github.com/metayeti/mINI
 
 #define _WriteMem(param, offset) WriteMem(param, #param, offset)
-#define GetGeneralConfig(key) cfg.key = ini[SECTION][#key]
+#define GetLoaderConfig(key) cfg.key = ini[SECTION][#key]
 #define GetLightConfig(key) cfg.light.key = ini[SECTION][#key]
 
 using namespace ModUtils;
 using namespace std;
+
+const string CONFIG_FOLDER = "CustomLantern";
 
 struct offsets
 {
@@ -47,12 +51,6 @@ struct cfg {
         string x; // 0.0
         string y; // 0.0
         string z; // 0.0
-
-        // deprecated
-        string luminous_intensity; // 1.25
-        string x_pos; // 0.0
-        string y_pos; // 0.0
-        string z_pos; // 0.0
     } light;
 
     string load_delay;
@@ -61,12 +59,14 @@ struct cfg {
     string region_size;
     string protect;
     string type;
-    string filename;
+    string config_path;
 } cfg;
 
 uintptr_t pBaseAddress = 0;
 
 uintptr_t* ptrFXRBaseAddress = nullptr;
+
+std::filesystem::path modFolder;
 
 void GetOffsets()
 {
@@ -134,7 +134,7 @@ uintptr_t* GetFXRBaseAddress()
     DWORD protect = (cfg.protect != "") ? stoul(cfg.protect, 0, 16) : PAGE_READWRITE;
     DWORD type = (cfg.type != "") ? stoul(cfg.type, 0, 16) : MEM_PRIVATE;
 
-    Log("Find the signature in memory");
+    Log("Find the signature in memory.");
     Log("start_address=0x%p", startAddress);
     Log("region_size=0x%p", regionSize);
     Log("protect=0x%X", protect);
@@ -183,82 +183,61 @@ uintptr_t* GetFXRBaseAddress()
     return nullptr;
 }
 
-void ReadGeneralConfig(string path)
+bool ReadLoaderConfig()
 {
     //
-    // config.ini
+    // loader.ini
     //
 
     const string SECTION = "config";
 
+    string filePath = (modFolder / CONFIG_FOLDER / "loader.ini").string();
+    Log("Read loader configuration file: " + filePath);
+
     // create a file instance
-    mINI::INIFile file(path + "\\config.ini");
+    mINI::INIFile file(filePath);
 
     // create a data structure
     mINI::INIStructure ini;
 
-    vector<string> keys{ "load_delay", "start_address", "region_size", "protect", "type", "filename" };
-
     if (!file.read(ini))
     {
-        for (size_t i = 0; i < keys.size(); i++)
-        {
-            // populate the structure
-            ini[SECTION][keys[i]] = "";
-
-            // generate an INI file (overwrites any previous file)
-            file.generate(ini);
-        }
+        Log("Error: Unable to read the loader file. File path: " + filePath);
+        return false;
     }
 
     // read values
-    GetGeneralConfig(load_delay);
-    GetGeneralConfig(start_address);
-    GetGeneralConfig(region_size);
-    GetGeneralConfig(protect);
-    GetGeneralConfig(type);
-    GetGeneralConfig(filename);
+    GetLoaderConfig(load_delay);
+    GetLoaderConfig(start_address);
+    GetLoaderConfig(region_size);
+    GetLoaderConfig(protect);
+    GetLoaderConfig(type);
+    GetLoaderConfig(config_path);
 
-    if (cfg.filename.empty())
-    {
-        cfg.filename = "custom-lantern.ini";
-        ini[SECTION]["filename"] = cfg.filename;
-    }
-
-    // write ini
-    file.write(ini);
+    return true;
 }
 
-void ReadLightConfig(string path)
+bool ReadLightConfig()
 {
     //
-    // custom-lantern.ini (by default)
+    // config.ini (by default)
     //
 
     const string SECTION = "config";
 
+    string filePath = (modFolder / CONFIG_FOLDER / cfg.config_path).string();
+    Log("Read mod configuration file: " + filePath);
+
     // create a file instance
-    mINI::INIFile file(path + "\\" + cfg.filename);
+    mINI::INIFile file(filePath);
 
     // create a data structure
     mINI::INIStructure ini;
 
-    vector<string> keys{
-        "red", "green", "blue", "alpha",
-        "sp_red", "sp_green", "sp_blue", "sp_alpha",
-        "radius", "intensity",
-        "x", "y", "z" };
-
     if (!file.read(ini))
     {
-        for (size_t i = 0; i < keys.size(); i++)
-        {
-            // populate the structure
-            ini[SECTION][keys[i]] = "";
-
-            // generate an INI file (overwrites any previous file)
-            file.generate(ini);
-        }
+        Log("Error: Unable to read the config file. File path: " + filePath);
+        return false;
     }
 
     // read values
@@ -275,40 +254,33 @@ void ReadLightConfig(string path)
     GetLightConfig(x);
     GetLightConfig(y);
     GetLightConfig(z);
-
-    // write ini
-    file.write(ini);
-
-    // deprecated
-    GetLightConfig(luminous_intensity);
-    GetLightConfig(x_pos);
-    GetLightConfig(y_pos);
-    GetLightConfig(z_pos);
 }
 
-void ReadConfig()
+bool ReadConfig()
 {
-    Log("Read configuration");
-
     const string CONFIG = "config";
 
-    string path = GetModuleFolderPath();
+    // loader.ini
+    if (!ReadLoaderConfig())
+    {
+        return false;
+    }
 
     // config.ini
-    ReadGeneralConfig(path);
+    if (!ReadLightConfig())
+    {
+        return false;
+    }
 
-    // custom-lantern.ini
-    ReadLightConfig(path);
+    return true;
 }
 
 DWORD WINAPI Patch(LPVOID hModule)
 {
-    Log("Activating Custom Lantern...");
-
-    ReadConfig();
+    Log("Activating Custom Lantern.");
 
     unsigned long loadDelay = (cfg.load_delay != "") ? stoul(cfg.load_delay) : 15000;
-    Log("Wait %lu ms", loadDelay);
+    Log("Wait %lu ms.", loadDelay);
     Sleep(loadDelay);
 
     DWORD pid = GetCurrentProcessId();
@@ -323,7 +295,7 @@ DWORD WINAPI Patch(LPVOID hModule)
     ptrFXRBaseAddress = GetFXRBaseAddress();
     if (!ptrFXRBaseAddress)
     {
-        RaiseError("Unable to find the signature in memory. Read the full logs in Game\\mods\\CustomLantern\\log.txt");
+        RaiseError("Unable to find the signature in memory. Read the full logs in the log.txt file in " + modFolder.string());
         CloseLog();
 
         return 1;
@@ -332,11 +304,11 @@ DWORD WINAPI Patch(LPVOID hModule)
     auto chronoEnd = chrono::high_resolution_clock::now();
     chrono::milliseconds duration = chrono::duration_cast<chrono::milliseconds>(chronoEnd - chronoStart);
 
-    Log("Found signature at: 0x%p in %llu milliseconds", ptrFXRBaseAddress, duration.count());
+    Log("Found signature at: 0x%p in %llu milliseconds.", ptrFXRBaseAddress, duration.count());
 
     GetOffsets();
 
-    Log("Write values in memory if any...");
+    Log("Write values in memory if any.");
 
     // light color
     _WriteMem(cfg.light.red, offsets.color);
@@ -361,12 +333,6 @@ DWORD WINAPI Patch(LPVOID hModule)
     _WriteMem(cfg.light.y, offsets.position + 4);
     _WriteMem(cfg.light.z, offsets.position + 8);
 
-    // deprecated
-    if (cfg.light.intensity == "") { _WriteMem(cfg.light.luminous_intensity, 0x1D0C); } // luminous_intensity deprecated
-    if (cfg.light.x == "") { _WriteMem(cfg.light.x_pos, 0x1C1C); } // x_pos deprecated
-    if (cfg.light.y == "") { _WriteMem(cfg.light.y_pos, 0x1C20); } // y_pos deprecated
-    if (cfg.light.z == "") { _WriteMem(cfg.light.z_pos, 0x1C24); } // z_pos deprecated
-
     Log("Patch applied (^.^)/ ");
     CloseLog();
 
@@ -385,6 +351,17 @@ BOOL APIENTRY DllMain(
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
+        wchar_t dllFilename[MAX_PATH] = { 0 };
+        GetModuleFileNameW(hModule, dllFilename, MAX_PATH);
+
+        modFolder = std::filesystem::path(dllFilename).parent_path();
+
+        if (!ReadConfig())
+        {
+            Log("Error: Unable to read the configuration file. Read the full logs in the log.txt file in " + modFolder.string());
+            return FALSE;
+        }
+
         DisableThreadLibraryCalls(hModule);
         HANDLE hThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)Patch, hModule, 0, nullptr);
         if (hThread)

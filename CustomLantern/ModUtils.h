@@ -16,6 +16,8 @@
 
 namespace ModUtils
 {
+    const std::string LOG_FOLDER = "CustomLantern";
+
     static std::string muModuleName = "";
     static HWND muWindow = NULL;
     static FILE* muLogFile = nullptr;
@@ -84,10 +86,29 @@ namespace ModUtils
         return moduleName;
     }
 
-    // Gets the path to the current mod relative to the game root folder
-    inline std::string GetModuleFolderPath()
+    // Gets the directory path where the DLL is located
+    inline std::string GetModuleDirectory(bool thisModule = true)
     {
-        return std::string("mods\\" + GetModuleName(true));
+        static char dummy = 'x';
+        HMODULE module = NULL;
+
+        if (thisModule)
+        {
+            GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, &dummy, &module);
+        }
+
+        char lpFilename[MAX_PATH];
+        GetModuleFileNameA(module, lpFilename, sizeof(lpFilename));
+
+        // Find the last backslash to isolate the directory path.
+        char* lastBackslash = strrchr(lpFilename, '\\');
+        if (lastBackslash != nullptr)
+        {
+            // Keep the trailing backslash and terminate the string.
+            *(lastBackslash + 1) = '\0';
+        }
+
+        return std::string(lpFilename);
     }
 
     // Logs both to std::out and to a log file simultaneously
@@ -100,8 +121,8 @@ namespace ModUtils
 
         if (muLogFile == nullptr && !muLogOpened)
         {
-            CreateDirectoryA(std::string("mods\\" + muModuleName).c_str(), NULL);
-            fopen_s(&muLogFile, std::string("mods\\" + muModuleName + "\\log.txt").c_str(), "w");
+            std::string dir = GetModuleDirectory();
+            fopen_s(&muLogFile, std::string(dir + "\\" + LOG_FOLDER + "\\log.txt").c_str(), "w");
             muLogOpened = true;
         }
 
